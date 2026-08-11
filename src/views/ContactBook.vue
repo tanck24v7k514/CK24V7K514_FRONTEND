@@ -1,37 +1,121 @@
 <template>
   <div class="page row">
-    <div class="col-md-10">
+    <!-- Thanh tìm kiếm -->
+    <div class="col-md-12 mb-3">
       <InputSearch v-model="searchText" />
     </div>
 
-    <div class="mt-3 col-md-6">
-      <h4>
-        Danh bạ
-        <i class="fas fa-address-book"></i>
-      </h4>
+    <!-- Thanh lọc Liên hệ yêu thích -->
+    <div class="col-md-12 mb-3 d-flex flex-wrap gap-2 align-items-center">
+      <button
+        class="btn btn-sm mr-2 mb-1"
+        :class="selectedFilter === 'ALL' ? 'btn-dark' : 'btn-outline-dark'"
+        @click="selectedFilter = 'ALL'"
+      >
+        Tất cả
+      </button>
+
+      <button
+        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
+        :class="
+          selectedFilter === 'Âm nhạc'
+            ? 'bg-music-custom active-filter'
+            : 'bg-music-custom opacity-60'
+        "
+        @click="selectedFilter = 'Âm nhạc'"
+      >
+        Âm nhạc
+      </button>
+
+      <button
+        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
+        :class="
+          selectedFilter === 'Thể thao'
+            ? 'bg-sports-custom active-filter'
+            : 'bg-sports-custom opacity-60'
+        "
+        @click="selectedFilter = 'Thể thao'"
+      >
+        Thể thao
+      </button>
+
+      <button
+        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
+        :class="
+          selectedFilter === 'Du lịch'
+            ? 'bg-travel-custom active-filter'
+            : 'bg-travel-custom opacity-60'
+        "
+        @click="selectedFilter = 'Du lịch'"
+      >
+        Du lịch
+      </button>
+
+      <button
+        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
+        :class="
+          selectedFilter === 'Đọc sách'
+            ? 'bg-reading-custom active-filter'
+            : 'bg-reading-custom opacity-60'
+        "
+        @click="selectedFilter = 'Đọc sách'"
+      >
+        Đọc sách
+      </button>
+    </div>
+
+    <!-- Cột Danh sách Liên hệ -->
+    <div class="mt-2 col-md-6">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="m-0">Danh bạ <i class="fas fa-address-book"></i></h4>
+        <button class="btn btn-sm btn-light border" @click="toggleSort">
+          Sắp xếp: {{ sortOrder === 'asc' ? 'A-Z ▲' : 'Z-A ▼' }}
+        </button>
+      </div>
+
       <ContactList
         v-if="filteredContactsCount > 0"
-        :contacts="filteredContacts"
+        :contacts="paginatedContacts"
         v-model:activeIndex="activeIndex"
       />
-      <p v-else>Không có liên hệ nào.</p>
+      <p v-else class="text-muted mt-2">Không có liên hệ nào.</p>
 
-      <div class="mt-3 row justify-content-around align-items-center">
-        <button class="btn btn-sm btn-primary" @click="refreshList()">
+      <!-- Phân trang -->
+      <nav class="mt-3" v-if="totalPages > 1">
+        <ul class="pagination pagination-sm justify-content-center">
+          <li class="page-item" :class="{ disabled: currentPage === 1 }">
+            <button class="page-link" @click="currentPage--">Trước</button>
+          </li>
+          <li
+            class="page-item"
+            v-for="p in totalPages"
+            :key="p"
+            :class="{ active: currentPage === p }"
+          >
+            <button class="page-link" @click="currentPage = p">{{ p }}</button>
+          </li>
+          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+            <button class="page-link" @click="currentPage++">Sau</button>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Hàng nút thao tác danh sách -->
+      <div class="mt-3 d-flex justify-content-between align-items-center">
+        <button class="btn btn-sm btn-primary flex-fill mr-1" @click="refreshList()">
           <i class="fas fa-redo"></i> Làm mới
         </button>
-
-        <button class="btn btn-sm btn-success" @click="goToAddContact">
+        <button class="btn btn-sm btn-success flex-fill mr-1" @click="goToAddContact">
           <i class="fas fa-plus"></i> Thêm mới
         </button>
-
-        <button class="btn btn-sm btn-danger" @click="removeAllContacts">
+        <button class="btn btn-sm btn-danger flex-fill" @click="removeAllContacts">
           <i class="fas fa-trash"></i> Xóa tất cả
         </button>
       </div>
     </div>
 
-    <div class="mt-3 col-md-6">
+    <!-- Cột Chi tiết Liên hệ -->
+    <div class="mt-2 col-md-6">
       <div v-if="activeContact">
         <h4>
           Chi tiết Liên hệ
@@ -70,39 +154,77 @@ export default {
       contacts: [],
       activeIndex: -1,
       searchText: '',
+      selectedFilter: 'ALL',
+      currentPage: 1,
+      pageSize: 5,
+      sortOrder: 'asc',
     }
   },
   watch: {
-    // Giám sát các thay đổi của biến searchText.
-    // Bỏ chọn phần tử đang được chọn trong danh sách.
     searchText() {
-      this.activeIndex = -1
+      this.resetSelection()
+    },
+    selectedFilter() {
+      this.resetSelection()
+    },
+    sortOrder() {
+      this.resetSelection()
     },
   },
   computed: {
-    // Chuyển các đối tượng contact thành chuỗi để tiện cho tìm kiếm.
-    contactStrings() {
-      return this.contacts.map((contact) => {
-        const { name, email, address, phone } = contact
-        return [name, email, address, phone].join('')
+    filteredContacts() {
+      let list = this.contacts
+      if (this.selectedFilter !== 'ALL') {
+        list = list.filter(
+          (contact) =>
+            Array.isArray(contact.favorite) && contact.favorite.includes(this.selectedFilter),
+        )
+      }
+      if (this.searchText) {
+        const search = this.searchText.toLowerCase().trim()
+        list = list.filter((contact) => {
+          const name = (contact.name || '').toLowerCase()
+          const email = (contact.email || '').toLowerCase()
+          const address = (contact.address || '').toLowerCase()
+          const phone = (contact.phone || '').toLowerCase()
+          return (
+            name.includes(search) ||
+            email.includes(search) ||
+            address.includes(search) ||
+            phone.includes(search)
+          )
+        })
+      }
+      return list
+    },
+    sortedContacts() {
+      return [...this.filteredContacts].sort((a, b) => {
+        const nameA = (a.name || '').toUpperCase()
+        const nameB = (b.name || '').toUpperCase()
+        if (this.sortOrder === 'asc') return nameA.localeCompare(nameB)
+        return nameB.localeCompare(nameA)
       })
     },
-    // Trả về các contact có chứa thông tin cần tìm kiếm.
-    filteredContacts() {
-      if (!this.searchText) return this.contacts
-      return this.contacts.filter((_contact, index) =>
-        this.contactStrings[index].includes(this.searchText),
-      )
+    totalPages() {
+      return Math.ceil(this.sortedContacts.length / this.pageSize) || 1
+    },
+    paginatedContacts() {
+      const start = (this.currentPage - 1) * this.pageSize
+      return this.sortedContacts.slice(start, start + this.pageSize)
     },
     activeContact() {
-      if (this.activeIndex < 0) return null
-      return this.filteredContacts[this.activeIndex]
+      if (this.activeIndex < 0 || !this.paginatedContacts[this.activeIndex]) return null
+      return this.paginatedContacts[this.activeIndex]
     },
     filteredContactsCount() {
       return this.filteredContacts.length
     },
   },
   methods: {
+    resetSelection() {
+      this.activeIndex = -1
+      this.currentPage = 1
+    },
     async retrieveContacts() {
       try {
         this.contacts = await ContactService.getAll()
@@ -110,12 +232,10 @@ export default {
         console.log(error)
       }
     },
-
     refreshList() {
       this.retrieveContacts()
-      this.activeIndex = -1
+      this.resetSelection()
     },
-
     async removeAllContacts() {
       if (confirm('Bạn muốn xóa tất cả Liên hệ?')) {
         try {
@@ -126,9 +246,11 @@ export default {
         }
       }
     },
-
     goToAddContact() {
       this.$router.push({ name: 'contact.add' })
+    },
+    toggleSort() {
+      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
     },
   },
   mounted() {
@@ -138,8 +260,26 @@ export default {
 </script>
 
 <style scoped>
-.page {
-  text-align: left;
-  max-width: 750px;
+/* Màu sắc đồng bộ chuẩn với ContactCard và ContactForm */
+.bg-music-custom {
+  background-color: #b5179e;
+}
+.bg-sports-custom {
+  background-color: #ff7096;
+}
+.bg-travel-custom {
+  background-color: #4ea8de;
+}
+.bg-reading-custom {
+  background-color: #74c69d;
+}
+
+/* Hiệu ứng nút bấm lọc */
+.opacity-60 {
+  opacity: 0.5;
+}
+.active-filter {
+  opacity: 1;
+  box-shadow: 0 0 0 2px #000;
 }
 </style>
