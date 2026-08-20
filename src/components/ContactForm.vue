@@ -132,7 +132,6 @@ export default {
 </script>
 
 <style scoped>
-/* 2. Cập nhật lại các mã màu đồng bộ với giao diện hiển thị chi tiết */
 .btn-music {
   background-color: #b5179e;
   color: #000;

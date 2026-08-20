@@ -1,70 +1,50 @@
 <template>
   <div class="page row">
-    <!-- Thanh tìm kiếm -->
-    <div class="col-md-12 mb-3">
+    <div class="col-md-10 mb-3">
       <InputSearch v-model="searchText" />
     </div>
-
-    <!-- Thanh lọc Liên hệ yêu thích -->
-    <div class="col-md-12 mb-3 d-flex flex-wrap gap-2 align-items-center">
+    <div class="mb-3 d-flex gap-2 flex-wrap">
       <button
-        class="btn btn-sm mr-2 mb-1"
-        :class="selectedFilter === 'ALL' ? 'btn-dark' : 'btn-outline-dark'"
-        @click="selectedFilter = 'ALL'"
+        class="btn btn-sm"
+        :class="selectedFilters.length === 0 ? 'btn-dark' : 'btn-outline-dark'"
+        @click="clearFilters"
       >
         Tất cả
       </button>
 
       <button
-        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
-        :class="
-          selectedFilter === 'Âm nhạc'
-            ? 'bg-music-custom active-filter'
-            : 'bg-music-custom opacity-60'
-        "
-        @click="selectedFilter = 'Âm nhạc'"
+        class="btn btn-sm bg-music-custom text-white"
+        :class="{ 'opacity-50': !isFilterSelected('Âm nhạc') }"
+        @click="toggleFilter('Âm nhạc')"
       >
-        Âm nhạc
+        Âm nhạc <i v-if="isFilterSelected('Âm nhạc')"></i>
       </button>
 
       <button
-        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
-        :class="
-          selectedFilter === 'Thể thao'
-            ? 'bg-sports-custom active-filter'
-            : 'bg-sports-custom opacity-60'
-        "
-        @click="selectedFilter = 'Thể thao'"
+        class="btn btn-sm bg-sports-custom text-white"
+        :class="{ 'opacity-50': !isFilterSelected('Thể thao') }"
+        @click="toggleFilter('Thể thao')"
       >
-        Thể thao
+        Thể thao <i v-if="isFilterSelected('Thể thao')"></i>
       </button>
 
       <button
-        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
-        :class="
-          selectedFilter === 'Du lịch'
-            ? 'bg-travel-custom active-filter'
-            : 'bg-travel-custom opacity-60'
-        "
-        @click="selectedFilter = 'Du lịch'"
+        class="btn btn-sm bg-travel-custom text-white"
+        :class="{ 'opacity-50': !isFilterSelected('Du lịch') }"
+        @click="toggleFilter('Du lịch')"
       >
-        Du lịch
+        Du lịch <i v-if="isFilterSelected('Du lịch')"></i>
       </button>
 
       <button
-        class="btn btn-sm mr-2 mb-1 text-white font-weight-bold"
-        :class="
-          selectedFilter === 'Đọc sách'
-            ? 'bg-reading-custom active-filter'
-            : 'bg-reading-custom opacity-60'
-        "
-        @click="selectedFilter = 'Đọc sách'"
+        class="btn btn-sm bg-reading-custom text-white"
+        :class="{ 'opacity-50': !isFilterSelected('Đọc sách') }"
+        @click="toggleFilter('Đọc sách')"
       >
-        Đọc sách
+        Đọc sách <i v-if="isFilterSelected('Đọc sách')"></i>
       </button>
     </div>
 
-    <!-- Cột Danh sách Liên hệ -->
     <div class="mt-2 col-md-6">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h4 class="m-0">Danh bạ <i class="fas fa-address-book"></i></h4>
@@ -80,7 +60,6 @@
       />
       <p v-else class="text-muted mt-2">Không có liên hệ nào.</p>
 
-      <!-- Phân trang -->
       <nav class="mt-3" v-if="totalPages > 1">
         <ul class="pagination pagination-sm justify-content-center">
           <li class="page-item" :class="{ disabled: currentPage === 1 }">
@@ -100,7 +79,6 @@
         </ul>
       </nav>
 
-      <!-- Hàng nút thao tác danh sách -->
       <div class="mt-3 d-flex justify-content-between align-items-center">
         <button class="btn btn-sm btn-primary flex-fill mr-1" @click="refreshList()">
           <i class="fas fa-redo"></i> Làm mới
@@ -114,7 +92,6 @@
       </div>
     </div>
 
-    <!-- Cột Chi tiết Liên hệ -->
     <div class="mt-2 col-md-6">
       <div v-if="activeContact">
         <h4>
@@ -154,7 +131,7 @@ export default {
       contacts: [],
       activeIndex: -1,
       searchText: '',
-      selectedFilter: 'ALL',
+      selectedFilters: [],
       currentPage: 1,
       pageSize: 5,
       sortOrder: 'asc',
@@ -164,8 +141,11 @@ export default {
     searchText() {
       this.resetSelection()
     },
-    selectedFilter() {
-      this.resetSelection()
+    selectedFilters: {
+      handler() {
+        this.resetSelection()
+      },
+      deep: true,
     },
     sortOrder() {
       this.resetSelection()
@@ -174,11 +154,11 @@ export default {
   computed: {
     filteredContacts() {
       let list = this.contacts
-      if (this.selectedFilter !== 'ALL') {
-        list = list.filter(
-          (contact) =>
-            Array.isArray(contact.favorite) && contact.favorite.includes(this.selectedFilter),
-        )
+      if (this.selectedFilters.length > 0) {
+        list = list.filter((contact) => {
+          if (!Array.isArray(contact.favorite)) return false
+          return this.selectedFilters.every((filter) => contact.favorite.includes(filter))
+        })
       }
       if (this.searchText) {
         const search = this.searchText.toLowerCase().trim()
@@ -221,6 +201,23 @@ export default {
     },
   },
   methods: {
+    isFilterSelected(name) {
+      return this.selectedFilters.includes(name)
+    },
+
+    toggleFilter(name) {
+      const index = this.selectedFilters.indexOf(name)
+      if (index > -1) {
+        this.selectedFilters.splice(index, 1)
+      } else {
+        this.selectedFilters.push(name)
+      }
+    },
+
+    clearFilters() {
+      this.selectedFilters = []
+    },
+
     resetSelection() {
       this.activeIndex = -1
       this.currentPage = 1
@@ -260,7 +257,6 @@ export default {
 </script>
 
 <style scoped>
-/* Màu sắc đồng bộ chuẩn với ContactCard và ContactForm */
 .bg-music-custom {
   background-color: #b5179e;
 }
@@ -274,10 +270,10 @@ export default {
   background-color: #74c69d;
 }
 
-/* Hiệu ứng nút bấm lọc */
 .opacity-60 {
   opacity: 0.5;
 }
+
 .active-filter {
   opacity: 1;
   box-shadow: 0 0 0 2px #000;
